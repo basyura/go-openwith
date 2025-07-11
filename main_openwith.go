@@ -1,119 +1,27 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+
+	"openwidth/config"
+	"openwidth/handler"
 )
 
-type URLPattern struct {
-	Pattern   string            `json:"pattern"`
-	Args      []string          `json:"args"`
-	URLParams map[string]string `json:"url_params"`
-}
-
-type Config struct {
-	Application string       `json:"application"`
-	URLPatterns []URLPattern `json:"url_patterns"`
-}
-
-var config Config
-
-func loadConfig() error {
-	file, err := os.Open("config.json")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	return decoder.Decode(&config)
-}
-
-type RequestBody struct {
-	URL string `json:"url"`
-}
-
-func openFile(c echo.Context) error {
-	fmt.Println("-------------------------------------------------------")
-	var body RequestBody
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
-	}
-
-	fmt.Println("url :", body.URL)
-	if body.URL == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "URL parameter is required"})
-	}
-
-	var args []string
-	modifiedURL := body.URL
-
-	for _, pattern := range config.URLPatterns {
-		matched, err := regexp.MatchString(pattern.Pattern, body.URL)
-		if err != nil {
-			continue
-		}
-		if !matched {
-			continue
-		}
-
-		if len(pattern.URLParams) > 0 {
-			parsedURL, err := url.Parse(body.URL)
-			if err == nil {
-				query := parsedURL.Query()
-				for key, value := range pattern.URLParams {
-					if query.Has(key) {
-						query.Set(key, value)
-					}
-				}
-				parsedURL.RawQuery = query.Encode()
-				modifiedURL = parsedURL.String()
-			}
-		}
-
-		args = make([]string, len(pattern.Args))
-		for i, arg := range pattern.Args {
-			args[i] = strings.Replace(arg, "$url", modifiedURL, -1)
-		}
-		break
-	}
-
-	var cmdArgs []string
-	if len(args) > 0 {
-		cmdArgs = args
-	} else {
-		cmdArgs = []string{modifiedURL}
-	}
-
-	cmd := exec.Command(config.Application, cmdArgs...)
-
-	fmt.Printf("Executing command: %s %s\n", config.Application, strings.Join(cmdArgs, " "))
-
-	err := cmd.Start()
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Cannot start application: %v", err)})
-	}
-
-	return c.JSON(http.StatusOK, map[string]string{
-		"message":     "URL opened successfully",
-		"url":         body.URL,
-		"application": config.Application,
-		"args":        fmt.Sprintf("%v", args),
-	})
-}
+var appConfig *config.Config
 
 func main() {
-	if err := loadConfig(); err != nil {
+	var err error
+	appConfig, err = config.LoadConfig()
+	if err != nil {
 		log.Fatal("Failed to load config file:", err)
 	}
 
@@ -125,4 +33,93 @@ func main() {
 
 	log.Println("Starting server on port 44525...")
 	e.Logger.Fatal(e.Start(":44525"))
+}
+
+func openFile(c echo.Context) error {
+	fmt.Println("-------------------------------------------------------")
+	var body handler.RequestBody
+	if err := c.Bind(&body); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+	}
+
+	fmt.Println("url :", body.URL)
+	if body.URL == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "URL parameter is required"})
+	}
+
+	args, modifiedURL := processURL(body.URL)
+	cmdArgs := buildCommandArgs(args, modifiedURL)
+
+	if err := executeCommand(cmdArgs); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Cannot start application: %v", err)})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message":     "URL opened successfully",
+		"url":         body.URL,
+		"application": appConfig.Application,
+		"args":        fmt.Sprintf("%v", args),
+	})
+}
+
+func processURL(originalURL string) ([]string, string) {
+	var args []string
+	modifiedURL := originalURL
+
+	for _, pattern := range appConfig.URLPatterns {
+		matched, err := regexp.MatchString(pattern.Pattern, originalURL)
+		if err != nil {
+			continue
+		}
+		if !matched {
+			continue
+		}
+
+		modifiedURL = modifyURLParams(originalURL, pattern.URLParams)
+		args = buildArgs(pattern.Args, modifiedURL)
+		break
+	}
+
+	return args, modifiedURL
+}
+
+func modifyURLParams(originalURL string, urlParams map[string]string) string {
+	if len(urlParams) == 0 {
+		return originalURL
+	}
+
+	parsedURL, err := url.Parse(originalURL)
+	if err != nil {
+		return originalURL
+	}
+
+	query := parsedURL.Query()
+	for key, value := range urlParams {
+		if query.Has(key) {
+			query.Set(key, value)
+		}
+	}
+	parsedURL.RawQuery = query.Encode()
+	return parsedURL.String()
+}
+
+func buildArgs(patternArgs []string, modifiedURL string) []string {
+	args := make([]string, len(patternArgs))
+	for i, arg := range patternArgs {
+		args[i] = strings.Replace(arg, "$url", modifiedURL, -1)
+	}
+	return args
+}
+
+func buildCommandArgs(args []string, modifiedURL string) []string {
+	if len(args) > 0 {
+		return args
+	}
+	return []string{modifiedURL}
+}
+
+func executeCommand(cmdArgs []string) error {
+	cmd := exec.Command(appConfig.Application, cmdArgs...)
+	fmt.Printf("Executing command: %s %s\n", appConfig.Application, strings.Join(cmdArgs, " "))
+	return cmd.Start()
 }
