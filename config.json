@@ -1,0 +1,16 @@
+{
+  "application": "/Applications/Vivaldi.app/Contents/MacOS/Vivaldi",
+  "url_patterns": [
+    {
+      "pattern": "^https?://github\\.com/.*",
+      "args": ["--new-window", "$url"]
+    },
+    {
+      "pattern": "^https?://.*\\.youtube\\.com/.*",
+      "args": ["--app=$url"],
+      "url_params": {
+        "t": "250s"
+      }
+    }
+  ]
+}
