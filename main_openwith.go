@@ -12,8 +12,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	"openwidth/config"
-	"openwidth/handler"
+	"openwith/config"
+	"openwith/handler"
 )
 
 var appConfig *config.Config

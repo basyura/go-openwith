@@ -1,4 +1,4 @@
-module openwidth
+module openwith
 
 go 1.24.2
 
