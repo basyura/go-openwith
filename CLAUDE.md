@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project called "openwith" - a minimal Go application with a single main file. The project uses Go 1.24.2 and has a basic module structure.
+This is a Go project called "openwith" - an HTTP server that receives URLs via POST requests and opens them with configured applications. The project uses Echo framework and supports pattern-based URL routing with customizable application arguments.
+
 ECHO を使い､POST リクエストでファイルを受け取ったときに､任意のアプリケーションを使ってファイルを開きます｡
 ファイルに対するアプリケーションの紐づけは json ファイルで設定します｡
 
@@ -15,7 +16,7 @@ ECHO を使い､POST リクエストでファイルを受け取ったときに�
 # Build the application
 go build -o openwith main_openwith.go
 
-# Run directly
+# Run directly (starts server on port 44525)
 go run main_openwith.go
 
 # Build and install
@@ -39,8 +40,28 @@ go mod tidy
 
 ## Architecture
 
-The project has a minimal structure:
-- `main_openwith.go` - Main application entry point (currently empty)
-- `go.mod` - Go module definition
+The project follows a modular structure:
 
-This appears to be a new/template project with the main implementation file currently empty, ready for development.
+### Core Components
+- `main_openwith.go` - Main HTTP server with Echo framework, handles POST requests to "/" endpoint
+- `config/config.go` - Configuration management for loading JSON config files
+- `handler/handler.go` - Request/response data structures 
+- `config.json` - Runtime configuration file (create from config.json.sample)
+
+### Key Functions
+- `openFile()` - Main POST handler that processes URL requests
+- `processURL()` - Matches URLs against configured patterns and builds arguments
+- `executeCommand()` - Executes the configured application with processed arguments
+
+### Configuration System
+The server reads `config.json` to determine:
+- Which application to launch (`application` field)
+- URL patterns with regex matching (`url_patterns` array)
+- Custom arguments per pattern (`args` field, supports `$url` placeholder)
+- URL parameter modifications (`url_params` field)
+
+### Server Details
+- Listens on port 44525
+- Accepts POST requests with JSON body: `{"url": "https://example.com"}`
+- Uses `cmd.Start()` to launch applications without blocking
+- Returns JSON responses with execution status
