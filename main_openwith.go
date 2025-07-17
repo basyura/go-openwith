@@ -3,123 +3,93 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
-	"os/exec"
-	"regexp"
-	"strings"
 
+	"os"
+
+	"github.com/kardianos/service"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-
-	"openwith/config"
-	"openwith/handler"
 )
 
-var appConfig *config.Config
+var Name = "OpenWith"
+var DisplayName = "OpenWith"
+var Description = "OpenWith Service"
+
+// perfv.go Run (mac だと認識してくれないので変数に入れてから呼ぶ)
+var Run func() *echo.Echo
+
+func doRun() *echo.Echo {
+	return Run()
+}
+
+var logger service.Logger
+
+type pgservice struct {
+	exit chan struct{}
+}
+
+func (e *pgservice) Start(s service.Service) error {
+	if service.Interactive() {
+		fmt.Println("*****  Running in terminal  *****")
+	} else {
+		logger.Info(DisplayName, "running under service manager.")
+	}
+	e.exit = make(chan struct{})
+	go e.run()
+
+	return nil
+}
+
+func (e *pgservice) run() error {
+
+	sv := doRun()
+
+	for {
+		select {
+		case <-e.exit:
+			logger.Info(DisplayName, "Stop ...")
+			sv.Close()
+			logger.Info(DisplayName, "Stop ... Done")
+			return nil
+		}
+	}
+
+}
+
+func (e *pgservice) Stop(s service.Service) error {
+	close(e.exit)
+	return nil
+}
 
 func main() {
-	var err error
-	appConfig, err = config.LoadConfig()
-	if err != nil {
-		log.Fatal("Failed to load config file:", err)
-	}
 
-	e := echo.New()
-	// e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-
-	e.POST("/", openFile)
-
-	log.Println("Starting server on port 44525...")
-	e.Logger.Fatal(e.Start(":44525"))
-}
-
-func openFile(c echo.Context) error {
-	fmt.Println("-------------------------------------------------------")
-	var body handler.RequestBody
-	if err := c.Bind(&body); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
-	}
-
-	fmt.Println("url :", body.URL)
-	if body.URL == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "URL parameter is required"})
-	}
-
-	args, modifiedURL := processURL(body.URL)
-	cmdArgs := buildCommandArgs(args, modifiedURL)
-
-	if err := executeCommand(cmdArgs); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Cannot start application: %v", err)})
-	}
-
-	return c.JSON(http.StatusOK, map[string]string{
-		"message":     "URL opened successfully",
-		"url":         body.URL,
-		"application": appConfig.Application,
-		"args":        fmt.Sprintf("%v", args),
+	program := &pgservice{}
+	s, err := service.New(program, &service.Config{
+		Name:        Name,
+		DisplayName: DisplayName,
+		Description: Description,
 	})
-}
 
-func processURL(originalURL string) ([]string, string) {
-	var args []string
-	modifiedURL := originalURL
-
-	for _, pattern := range appConfig.URLPatterns {
-		matched, err := regexp.MatchString(pattern.Pattern, originalURL)
-		if err != nil {
-			continue
-		}
-		if !matched {
-			continue
-		}
-
-		modifiedURL = modifyURLParams(originalURL, pattern.URLParams)
-		args = buildArgs(pattern.Args, modifiedURL)
-		break
-	}
-
-	return args, modifiedURL
-}
-
-func modifyURLParams(originalURL string, urlParams map[string]string) string {
-	if len(urlParams) == 0 {
-		return originalURL
-	}
-
-	parsedURL, err := url.Parse(originalURL)
 	if err != nil {
-		return originalURL
+		log.Fatal(err)
 	}
 
-	query := parsedURL.Query()
-	for key, value := range urlParams {
-		if query.Has(key) {
-			query.Set(key, value)
+	// Setup the logger
+	errs := make(chan error, 5)
+	logger, err = s.Logger(errs)
+	if err != nil {
+		log.Fatal()
+	}
+
+	if len(os.Args) > 1 {
+		err = service.Control(s, os.Args[1])
+		if err != nil {
+			fmt.Printf("Failed (%s) : %s\n", os.Args[1], err)
+			return
 		}
+		fmt.Printf("Succeeded (%s)\n", os.Args[1])
+		return
 	}
-	parsedURL.RawQuery = query.Encode()
-	return parsedURL.String()
-}
 
-func buildArgs(patternArgs []string, modifiedURL string) []string {
-	args := make([]string, len(patternArgs))
-	for i, arg := range patternArgs {
-		args[i] = strings.Replace(arg, "$url", modifiedURL, -1)
-	}
-	return args
-}
-
-func buildCommandArgs(args []string, modifiedURL string) []string {
-	if len(args) > 0 {
-		return args
-	}
-	return []string{modifiedURL}
-}
-
-func executeCommand(cmdArgs []string) error {
-	cmd := exec.Command(appConfig.Application, cmdArgs...)
-	fmt.Printf("Executing command: %s %s\n", appConfig.Application, strings.Join(cmdArgs, " "))
-	return cmd.Start()
+	// run in terminal
+	s.Run()
 }
