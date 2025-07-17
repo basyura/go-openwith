@@ -7,26 +7,31 @@ import (
 	"net/url"
 	"openwith/config"
 	"openwith/handler"
+	"os"
 	"os/exec"
-	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
 func init() {
-	Run = mainRun
+	Run = MainRun
 }
 
 var appConfig *config.Config
+var configMutex sync.RWMutex
 
-func mainRun() *echo.Echo {
+func MainRun() *echo.Echo {
 	var err error
 	appConfig, err = config.LoadConfig()
 	if err != nil {
 		log.Fatal("Failed to load config file:", err)
 	}
+
+	go watchConfigFile()
 
 	e := echo.New()
 	// e.Use(middleware.Logger())
@@ -35,9 +40,12 @@ func mainRun() *echo.Echo {
 	e.POST("/", openFile)
 
 	port := ":44525"
+	configMutex.RLock()
 	if appConfig.Port != 0 {
 		port = fmt.Sprintf(":%d", appConfig.Port)
 	}
+	configMutex.RUnlock()
+	
 	log.Printf("Starting server on port %s...", port)
 	e.Logger.Fatal(e.Start(port))
 
@@ -75,12 +83,14 @@ func processURL(originalURL string) ([]string, string) {
 	var args []string
 	modifiedURL := originalURL
 
+	configMutex.RLock()
+	defer configMutex.RUnlock()
+
 	for _, pattern := range appConfig.URLPatterns {
-		matched, err := regexp.MatchString(pattern.Pattern, originalURL)
-		if err != nil {
+		if pattern.CompiledReg == nil {
 			continue
 		}
-		if !matched {
+		if !pattern.CompiledReg.MatchString(originalURL) {
 			continue
 		}
 
@@ -128,7 +138,41 @@ func buildCommandArgs(args []string, modifiedURL string) []string {
 }
 
 func executeCommand(cmdArgs []string) error {
-	cmd := exec.Command(appConfig.Application, cmdArgs...)
-	fmt.Printf("Executing command: %s %s\n", appConfig.Application, strings.Join(cmdArgs, " "))
+	configMutex.RLock()
+	app := appConfig.Application
+	configMutex.RUnlock()
+
+	cmd := exec.Command(app, cmdArgs...)
+	fmt.Printf("Executing command: %s %s\n", app, strings.Join(cmdArgs, " "))
 	return cmd.Start()
+}
+
+func watchConfigFile() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	var lastModTime time.Time
+	if stat, err := os.Stat("config.json"); err == nil {
+		lastModTime = stat.ModTime()
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			if stat, err := os.Stat("config.json"); err == nil {
+				if stat.ModTime().After(lastModTime) {
+					log.Println("Config file changed, reloading...")
+					if newConfig, err := config.LoadConfig(); err == nil {
+						configMutex.Lock()
+						appConfig = newConfig
+						configMutex.Unlock()
+						log.Println("Config reloaded successfully")
+					} else {
+						log.Printf("Failed to reload config: %v", err)
+					}
+					lastModTime = stat.ModTime()
+				}
+			}
+		}
+	}
 }

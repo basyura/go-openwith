@@ -3,12 +3,14 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 )
 
 type URLPattern struct {
-	Pattern   string            `json:"pattern"`
-	Args      []string          `json:"args"`
-	URLParams map[string]string `json:"url_params"`
+	Pattern     string            `json:"pattern"`
+	Args        []string          `json:"args"`
+	URLParams   map[string]string `json:"url_params"`
+	CompiledReg *regexp.Regexp    `json:"-"`
 }
 
 type Config struct {
@@ -29,6 +31,14 @@ func LoadConfig() (*Config, error) {
 	err = decoder.Decode(&config)
 	if err != nil {
 		return nil, err
+	}
+
+	for i := range config.URLPatterns {
+		pattern := &config.URLPatterns[i]
+		pattern.CompiledReg, err = regexp.Compile(pattern.Pattern)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &config, nil
