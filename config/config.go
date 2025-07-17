@@ -13,6 +13,7 @@ type URLPattern struct {
 
 type Config struct {
 	Application string       `json:"application"`
+	Port        int          `json:"port"`
 	URLPatterns []URLPattern `json:"url_patterns"`
 }
 

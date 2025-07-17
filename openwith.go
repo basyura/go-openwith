@@ -34,8 +34,12 @@ func mainRun() *echo.Echo {
 
 	e.POST("/", openFile)
 
-	log.Println("Starting server on port 44525...")
-	e.Logger.Fatal(e.Start(":44525"))
+	port := ":44525"
+	if appConfig.Port != 0 {
+		port = fmt.Sprintf(":%d", appConfig.Port)
+	}
+	log.Printf("Starting server on port %s...", port)
+	e.Logger.Fatal(e.Start(port))
 
 	return e
 }

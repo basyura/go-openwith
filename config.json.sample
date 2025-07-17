@@ -1,5 +1,6 @@
 {
   "application": "/Applications/Vivaldi.app/Contents/MacOS/Vivaldi",
+  "port": 44525,
   "url_patterns": [
     {
       "pattern": "^https?://github\\.com/.*",
