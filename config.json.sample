@@ -12,6 +12,10 @@
       "url_params": {
         "t": "250s"
       }
-    }
+    },
+    {
+      "pattern": ".*",
+      "args": ["--app=$url"]
+    },
   ]
 }
