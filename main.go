@@ -31,6 +31,8 @@ func (e *pgservice) Start(s service.Service) error {
 		fmt.Println("*****  Running in terminal  *****")
 	} else {
 		serviceLogger.Info(DisplayName, "running under service manager.")
+		// Set environment variable to indicate service mode
+		os.Setenv("SERVICE_MODE", "true")
 	}
 	e.exit = make(chan struct{})
 	go e.run()

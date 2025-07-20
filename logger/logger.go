@@ -35,6 +35,10 @@ func (cl *CustomLogger) Write(p []byte) (n int, err error) {
 }
 
 func Initialize() error {
+	return InitializeWithMode(false)
+}
+
+func InitializeWithMode(serviceMode bool) error {
 	// Get the directory of the current executable
 	exePath, err := os.Executable()
 	if err != nil {
@@ -48,8 +52,12 @@ func Initialize() error {
 		return err
 	}
 
-	// Set up multi-writer for both console and file
-	logWriter = io.MultiWriter(os.Stdout, logFile)
+	// For service mode, only write to file. For interactive mode, write to both console and file
+	if serviceMode {
+		logWriter = logFile
+	} else {
+		logWriter = io.MultiWriter(os.Stdout, logFile)
+	}
 
 	// Use custom logger
 	customLogger := &CustomLogger{}

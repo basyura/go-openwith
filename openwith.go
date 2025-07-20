@@ -27,8 +27,9 @@ var appConfig *config.Config
 var configMutex sync.RWMutex
 
 func MainRun() *echo.Echo {
-	// Initialize logger first
-	if err := logger.Initialize(); err != nil {
+	// Initialize logger first (check if running as service)
+	serviceMode := os.Getenv("SERVICE_MODE") == "true"
+	if err := logger.InitializeWithMode(serviceMode); err != nil {
 		log.Printf("Failed to initialize logger: %v", err)
 	}
 
