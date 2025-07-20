@@ -36,12 +36,11 @@ func (cl *CustomLogger) Write(p []byte) (n int, err error) {
 
 func Initialize() error {
 	// Get the directory of the current executable
-	// exePath, err := os.Executable()
-	// if err != nil {
-	// 	return err
-	// }
-	//exeDir := filepath.Dir(exePath)
-	exeDir := `C:\repos\golang\openwith`
+	exePath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exeDir := filepath.Dir(exePath)
 	logPath := filepath.Join(exeDir, "application.log")
 
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
