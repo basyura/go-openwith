@@ -21,6 +21,38 @@ func init() {
 var appConfig *config.Config
 var configMutex sync.RWMutex
 
+// logBoxMessage creates a bordered log message with aligned # characters
+func logBoxMessage(format string, args ...interface{}) {
+	// Format the message
+	message := fmt.Sprintf(format, args...)
+
+	// Calculate total width needed
+	totalWidth := len(message) + 4 // +4 for "# " and " #"
+
+	// Create the border line
+	border := ""
+	for i := 0; i < totalWidth; i++ {
+		border += "#"
+	}
+
+	// Create empty line with borders
+	emptyLine := "#"
+	for i := 0; i < totalWidth-2; i++ {
+		emptyLine += " "
+	}
+	emptyLine += "#"
+
+	// Create content line
+	contentLine := "# " + message + " #"
+
+	// Print the box
+	log.Printf(border)
+	log.Printf(emptyLine)
+	log.Printf(contentLine)
+	log.Printf(emptyLine)
+	log.Printf(border)
+}
+
 func MainRun() *echo.Echo {
 	// Initialize logger first (check if running as service)
 	serviceMode := os.Getenv("SERVICE_MODE") == "true"
@@ -55,11 +87,7 @@ func MainRun() *echo.Echo {
 	}
 	configMutex.RUnlock()
 
-	log.Printf("#########################################")
-	log.Printf("#                                       #")
-	log.Printf("#   Starting server on port %s...   #", port)
-	log.Printf("#                                       #")
-	log.Printf("#########################################")
+	logBoxMessage("Starting server on port %s", port)
 
 	// Log configuration details as formatted JSON
 	configJSON, err := json.MarshalIndent(appConfig, "", "  ")
@@ -74,7 +102,3 @@ func MainRun() *echo.Echo {
 
 	return e
 }
-
-
-
-
