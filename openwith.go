@@ -22,7 +22,7 @@ var appConfig *config.Config
 var configMutex sync.RWMutex
 
 // logBoxMessage creates a bordered log message with aligned # characters
-func logBoxMessage(format string, args ...interface{}) {
+func logBoxMessage(format string, args ...any) {
 	// Format the message
 	message := fmt.Sprintf(format, args...)
 
@@ -31,13 +31,13 @@ func logBoxMessage(format string, args ...interface{}) {
 
 	// Create the border line
 	border := ""
-	for i := 0; i < totalWidth; i++ {
+	for range totalWidth {
 		border += "#"
 	}
 
 	// Create empty line with borders
 	emptyLine := "#"
-	for i := 0; i < totalWidth-2; i++ {
+	for range totalWidth - 2 {
 		emptyLine += " "
 	}
 	emptyLine += "#"
@@ -46,11 +46,11 @@ func logBoxMessage(format string, args ...interface{}) {
 	contentLine := "# " + message + " #"
 
 	// Print the box
-	log.Printf(border)
-	log.Printf(emptyLine)
-	log.Printf(contentLine)
-	log.Printf(emptyLine)
-	log.Printf(border)
+	log.Print(border)
+	log.Print(emptyLine)
+	log.Print(contentLine)
+	log.Print(emptyLine)
+	log.Print(border)
 }
 
 func MainRun() *echo.Echo {
