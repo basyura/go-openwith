@@ -166,7 +166,28 @@ func executeCommand(cmdArgs []string) error {
 
 	cmd := exec.Command(app, cmdArgs...)
 	log.Printf("Executing command: %s %s\n", app, strings.Join(cmdArgs, " "))
-	return cmd.Start()
+	
+	// Execute command and capture output
+	output, err := cmd.CombinedOutput()
+	
+	// Convert output to UTF-8 if needed
+	outputStr := logger.ConvertToUTF8(output)
+	
+	// Log execution result
+	if err != nil {
+		log.Printf("Command execution failed: %v", err)
+		if len(outputStr) > 0 {
+			log.Printf("Command output: %s", outputStr)
+		}
+		return err
+	} else {
+		log.Printf("Command executed successfully")
+		if len(outputStr) > 0 {
+			log.Printf("Command output: %s", outputStr)
+		}
+	}
+	
+	return nil
 }
 
 func watchConfigFile() {

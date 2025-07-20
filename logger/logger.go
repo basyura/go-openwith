@@ -8,6 +8,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+	"unicode/utf8"
+
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/transform"
 )
 
 var logWriter io.Writer
@@ -65,4 +69,29 @@ func InitializeWithMode(serviceMode bool) error {
 	log.SetFlags(0) // Remove default formatting since we handle it in CustomLogger
 
 	return nil
+}
+
+// ConvertToUTF8 converts byte slice to UTF-8 string, handling Japanese encoding if needed
+func ConvertToUTF8(data []byte) string {
+	// First check if it's already valid UTF-8
+	if utf8.Valid(data) {
+		return string(data)
+	}
+	
+	// Try to decode as Shift_JIS (common on Windows)
+	decoder := japanese.ShiftJIS.NewDecoder()
+	result, _, err := transform.Bytes(decoder, data)
+	if err == nil && utf8.Valid(result) {
+		return string(result)
+	}
+	
+	// If Shift_JIS fails, try EUC-JP
+	decoder = japanese.EUCJP.NewDecoder()
+	result, _, err = transform.Bytes(decoder, data)
+	if err == nil && utf8.Valid(result) {
+		return string(result)
+	}
+	
+	// If all else fails, return as-is (may contain invalid UTF-8)
+	return string(data)
 }
