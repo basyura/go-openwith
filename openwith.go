@@ -148,18 +148,24 @@ func executeCommand(cmdArgs []string) error {
 }
 
 func watchConfigFile() {
+	configPath, err := config.GetConfigPath()
+	if err != nil {
+		log.Printf("Failed to get config path: %v", err)
+		return
+	}
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	var lastModTime time.Time
-	if stat, err := os.Stat("config.json"); err == nil {
+	if stat, err := os.Stat(configPath); err == nil {
 		lastModTime = stat.ModTime()
 	}
 
 	for {
 		select {
 		case <-ticker.C:
-			if stat, err := os.Stat("config.json"); err == nil {
+			if stat, err := os.Stat(configPath); err == nil {
 				if stat.ModTime().After(lastModTime) {
 					log.Println("Config file changed, reloading...")
 					if newConfig, err := config.LoadConfig(); err == nil {

@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 )
 
@@ -20,7 +21,12 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	file, err := os.Open("config.json")
+	configPath, err := GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	
+	file, err := os.Open(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -42,4 +48,14 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func GetConfigPath() (string, error) {
+	// Get the directory of the current executable
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	exeDir := filepath.Dir(exePath)
+	return filepath.Join(exeDir, "config.json"), nil
 }
