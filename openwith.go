@@ -9,7 +9,6 @@ import (
 	"openwith/logger"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -35,22 +34,19 @@ func MainRun() *echo.Echo {
 		log.Fatal("Failed to load config file:", err)
 	}
 
-	go watchConfigFile()
+	// Setup handler
+	h := handler.NewHandler(&configMutex, appConfig)
+
+	// Start config file watching with callback to update handler
+	go config.WatchConfigFile(&configMutex, &appConfig, func(newConfig *config.Config) {
+		h.UpdateConfig(newConfig)
+	})
 
 	e := echo.New()
 	// e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	// Setup handler
-	h := &handler.Handler{
-		GetConfig: func() *config.Config {
-			configMutex.RLock()
-			defer configMutex.RUnlock()
-			return appConfig
-		},
-	}
-
-	e.POST("/", h.OpenFile)
+	e.POST("/", h.Handle)
 
 	port := ":44525"
 	configMutex.RLock()
@@ -82,38 +78,3 @@ func MainRun() *echo.Echo {
 
 
 
-func watchConfigFile() {
-	configPath, err := config.GetConfigPath()
-	if err != nil {
-		log.Printf("Failed to get config path: %v", err)
-		return
-	}
-
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	var lastModTime time.Time
-	if stat, err := os.Stat(configPath); err == nil {
-		lastModTime = stat.ModTime()
-	}
-
-	for {
-		select {
-		case <-ticker.C:
-			if stat, err := os.Stat(configPath); err == nil {
-				if stat.ModTime().After(lastModTime) {
-					log.Println("Config file changed, reloading...")
-					if newConfig, err := config.LoadConfig(); err == nil {
-						configMutex.Lock()
-						appConfig = newConfig
-						configMutex.Unlock()
-						log.Println("Config reloaded successfully")
-					} else {
-						log.Printf("Failed to reload config: %v", err)
-					}
-					lastModTime = stat.ModTime()
-				}
-			}
-		}
-	}
-}

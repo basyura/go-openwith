@@ -12,16 +12,40 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	GetConfig func() *config.Config
+	configMutex *sync.RWMutex
+	appConfig   *config.Config
 }
 
-// OpenFile handles POST requests to open URLs with configured applications
-func (h *Handler) OpenFile(c echo.Context) error {
+// NewHandler creates a new handler instance
+func NewHandler(configMutex *sync.RWMutex, appConfig *config.Config) *Handler {
+	return &Handler{
+		configMutex: configMutex,
+		appConfig:   appConfig,
+	}
+}
+
+// GetConfig safely returns the current configuration
+func (h *Handler) GetConfig() *config.Config {
+	h.configMutex.RLock()
+	defer h.configMutex.RUnlock()
+	return h.appConfig
+}
+
+// UpdateConfig safely updates the configuration
+func (h *Handler) UpdateConfig(newConfig *config.Config) {
+	h.configMutex.Lock()
+	defer h.configMutex.Unlock()
+	h.appConfig = newConfig
+}
+
+// Handle handles POST requests to open URLs with configured applications
+func (h *Handler) Handle(c echo.Context) error {
 	log.Println("-------------------------------------------------------")
 	var body RequestBody
 	if err := c.Bind(&body); err != nil {
