@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"openwith/config"
 	"openwith/handler"
+	"openwith/logger"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,6 +27,11 @@ var appConfig *config.Config
 var configMutex sync.RWMutex
 
 func MainRun() *echo.Echo {
+	// Initialize logger first
+	if err := logger.Initialize(); err != nil {
+		log.Printf("Failed to initialize logger: %v", err)
+	}
+
 	var err error
 	appConfig, err = config.LoadConfig()
 	if err != nil {
@@ -45,21 +52,35 @@ func MainRun() *echo.Echo {
 		port = fmt.Sprintf(":%d", appConfig.Port)
 	}
 	configMutex.RUnlock()
-	
-	log.Printf("Starting server on port %s...", port)
+
+	log.Printf("#########################################")
+	log.Printf("#                                       #")
+	log.Printf("#   Starting server on port %s...   #", port)
+	log.Printf("#                                       #")
+	log.Printf("#########################################")
+
+	// Log configuration details as formatted JSON
+	configJSON, err := json.MarshalIndent(appConfig, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal config to JSON: %v", err)
+	} else {
+		log.Printf("Config loaded successfully:")
+		log.Printf("%s", string(configJSON))
+	}
+
 	e.Logger.Fatal(e.Start(port))
 
 	return e
 }
 
 func openFile(c echo.Context) error {
-	fmt.Println("-------------------------------------------------------")
+	log.Println("-------------------------------------------------------")
 	var body handler.RequestBody
 	if err := c.Bind(&body); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
 	}
 
-	fmt.Println("url :", body.URL)
+	log.Println("url :", body.URL)
 	if body.URL == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "URL parameter is required"})
 	}
@@ -143,7 +164,7 @@ func executeCommand(cmdArgs []string) error {
 	configMutex.RUnlock()
 
 	cmd := exec.Command(app, cmdArgs...)
-	fmt.Printf("Executing command: %s %s\n", app, strings.Join(cmdArgs, " "))
+	log.Printf("Executing command: %s %s\n", app, strings.Join(cmdArgs, " "))
 	return cmd.Start()
 }
 

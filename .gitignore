@@ -1,3 +1,5 @@
 config.json
 openwith
 *.exe
+.claude
+application.log

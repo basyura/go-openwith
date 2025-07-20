@@ -20,7 +20,7 @@ func doRun() *echo.Echo {
 	return Run()
 }
 
-var logger service.Logger
+var serviceLogger service.Logger
 
 type pgservice struct {
 	exit chan struct{}
@@ -30,7 +30,7 @@ func (e *pgservice) Start(s service.Service) error {
 	if service.Interactive() {
 		fmt.Println("*****  Running in terminal  *****")
 	} else {
-		logger.Info(DisplayName, "running under service manager.")
+		serviceLogger.Info(DisplayName, "running under service manager.")
 	}
 	e.exit = make(chan struct{})
 	go e.run()
@@ -45,9 +45,9 @@ func (e *pgservice) run() error {
 	for {
 		select {
 		case <-e.exit:
-			logger.Info(DisplayName, "Stop ...")
+			serviceLogger.Info(DisplayName, "Stop ...")
 			sv.Close()
-			logger.Info(DisplayName, "Stop ... Done")
+			serviceLogger.Info(DisplayName, "Stop ... Done")
 			return nil
 		}
 	}
@@ -74,7 +74,7 @@ func main() {
 
 	// Setup the logger
 	errs := make(chan error, 5)
-	logger, err = s.Logger(errs)
+	serviceLogger, err = s.Logger(errs)
 	if err != nil {
 		log.Fatal()
 	}

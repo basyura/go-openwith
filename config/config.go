@@ -25,7 +25,7 @@ func LoadConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	file, err := os.Open(configPath)
 	if err != nil {
 		return nil, err
