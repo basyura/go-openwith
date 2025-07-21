@@ -4,20 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project called "openwith" - an HTTP server that receives URLs via POST requests and opens them with configured applications. The project uses Echo framework and supports pattern-based URL routing with customizable application arguments.
-
-ECHO を使い､POST リクエストでファイルを受け取ったときに､任意のアプリケーションを使ってファイルを開きます｡
-ファイルに対するアプリケーションの紐づけは json ファイルで設定します｡
+This is a Go project called "openwith" - an HTTP server that receives URLs via POST requests and opens them with configured applications. The project uses Echo framework and supports pattern-based URL routing with customizable application arguments. It can run as both a standalone application and a Windows service.
 
 ## Development Commands
 
 ### Build and Run
 ```bash
 # Build the application
-go build -o openwith main_openwith.go
+go build -o openwith main.go openwith.go
 
 # Run directly (starts server on port 44525)
-go run main_openwith.go
+go run main.go openwith.go
 
 # Build and install
 go install
@@ -43,25 +40,32 @@ go mod tidy
 The project follows a modular structure:
 
 ### Core Components
-- `main_openwith.go` - Main HTTP server with Echo framework, handles POST requests to "/" endpoint
-- `config/config.go` - Configuration management for loading JSON config files
-- `handler/handler.go` - Request/response data structures 
+- `main.go` - Service wrapper for running as Windows service or terminal application
+- `openwith.go` - Main HTTP server with Echo framework, handles POST requests to "/" endpoint
+- `config/config.go` - Configuration management for loading and watching JSON config files
+- `handler/handler.go` - Main request handler logic
+- `handler/types.go` - Request/response data structures
+- `logger/logger.go` - Centralized logging with file output support
+- `windows/session.go` - Windows session management for service execution
 - `config.json` - Runtime configuration file (create from config.json.sample)
 
 ### Key Functions
-- `openFile()` - Main POST handler that processes URL requests
-- `processURL()` - Matches URLs against configured patterns and builds arguments
-- `executeCommand()` - Executes the configured application with processed arguments
+- `MainRun()` - Main server initialization and startup in openwith.go:56
+- `Handle()` - Main POST handler that processes URL requests in handler/handler.go
+- Service management functions in main.go for Windows service support
 
 ### Configuration System
 The server reads `config.json` to determine:
 - Which application to launch (`application` field)
+- Server port configuration (`port` field, defaults to 44525)
 - URL patterns with regex matching (`url_patterns` array)
 - Custom arguments per pattern (`args` field, supports `$url` placeholder)
 - URL parameter modifications (`url_params` field)
 
 ### Server Details
-- Listens on port 44525
+- Listens on configurable port (default 44525)
 - Accepts POST requests with JSON body: `{"url": "https://example.com"}`
-- Uses `cmd.Start()` to launch applications without blocking
+- Supports hot-reloading of configuration files
+- Uses structured logging with boxed messages
+- Can run as Windows service or standalone application
 - Returns JSON responses with execution status
